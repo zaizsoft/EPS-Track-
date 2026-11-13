@@ -1,0 +1,324 @@
+{
+  "entities": {
+    "TeacherWorkspace": {
+      "title": "TeacherWorkspace",
+      "description": "Teacher profile and school metadata document acting as the parent workspace root for a PE teacher.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of the teacher owning this workspace."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Display name of the teacher."
+        },
+        "schoolName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "description": "Name of the school."
+        },
+        "subject": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Subject taught (Physical Education)."
+        },
+        "academicYear": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 32,
+          "description": "Academic year string."
+        },
+        "activeSessionTopic": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 160,
+          "description": "Current active PE session topic."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server last update timestamp."
+        }
+      },
+      "required": [
+        "ownerId",
+        "name",
+        "schoolName",
+        "subject",
+        "academicYear",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ClassGroup": {
+      "title": "ClassGroup",
+      "description": "A school class/section managed by the PE teacher.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "grade": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "academicYear": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 32
+        },
+        "studentCount": {
+          "type": "integer"
+        },
+        "scheduleDay": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 40
+        },
+        "scheduleTime": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 40
+        },
+        "colorTag": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "ownerId",
+        "name",
+        "grade",
+        "academicYear",
+        "studentCount",
+        "colorTag",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Student": {
+      "title": "Student",
+      "description": "A student belonging to a teacher's class.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "classId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "studentNumber": {
+          "type": "integer"
+        },
+        "firstName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "lastName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "gender": {
+          "type": "string",
+          "enum": ["M", "F"]
+        },
+        "medicalStatus": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 160
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "ownerId",
+        "classId",
+        "studentNumber",
+        "firstName",
+        "lastName",
+        "gender",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Observation": {
+      "title": "Observation",
+      "description": "Field observation recorded by the PE teacher for a student during a session.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "studentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "studentName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "studentNumber": {
+          "type": "integer"
+        },
+        "classId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "className": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "absent",
+            "late",
+            "no_uniform",
+            "positive",
+            "negative",
+            "dispensed",
+            "injury"
+          ]
+        },
+        "date": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 10
+        },
+        "time": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 12
+        },
+        "timestamp": {
+          "type": "integer"
+        },
+        "noteText": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 300
+        },
+        "sessionTopic": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 160
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "ownerId",
+        "studentId",
+        "studentName",
+        "studentNumber",
+        "classId",
+        "className",
+        "type",
+        "date",
+        "time",
+        "timestamp",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/teachers/{teacherId}": {
+      "schema": { "$ref": "#/entities/TeacherWorkspace" },
+      "description": "Root workspace profile for each authenticated PE teacher."
+    },
+    "/teachers/{teacherId}/classes/{classId}": {
+      "schema": { "$ref": "#/entities/ClassGroup" },
+      "description": "Classes taught by the teacher."
+    },
+    "/teachers/{teacherId}/students/{studentId}": {
+      "schema": { "$ref": "#/entities/Student" },
+      "description": "Student roster entries belonging to the teacher."
+    },
+    "/teachers/{teacherId}/observations/{observationId}": {
+      "schema": { "$ref": "#/entities/Observation" },
+      "description": "Real-time field observations recorded by the teacher."
+    }
+  }
+}

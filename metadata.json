@@ -1,0 +1,8 @@
+{
+  "name": "EPS Track - نظام متابعة التربية البدنية والرياضية",
+  "description": "نظام رقمي متكامل لأستاذ التربية البدنية والرياضية يجمع بين تطبيق الميدان السريع للهاتف ولوحة التحكم المركزية للحاسوب مع مزامنة سحابية فورية عبر Google Firebase.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

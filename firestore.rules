@@ -1,0 +1,214 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global safety net: default-deny all unspecified paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Core security primitives
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isVerifiedUser() && request.auth.uid == userId;
+    }
+
+    // Entity validation helpers (strict schema & size boundaries)
+    function isValidTeacherWorkspace(data) {
+      return data.keys().hasAll(['ownerId', 'name', 'schoolName', 'subject', 'academicYear', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'name', 'schoolName', 'subject', 'academicYear', 'activeSessionTopic', 'createdAt', 'updatedAt'])
+        && isValidId(data.ownerId)
+        && data.ownerId == request.auth.uid
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 120
+        && data.schoolName is string && data.schoolName.size() >= 1 && data.schoolName.size() <= 160
+        && data.subject is string && data.subject.size() >= 1 && data.subject.size() <= 120
+        && data.academicYear is string && data.academicYear.size() >= 4 && data.academicYear.size() <= 32
+        && (!('activeSessionTopic' in data) || (data.activeSessionTopic is string && data.activeSessionTopic.size() <= 160))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidClassGroup(data) {
+      return data.keys().hasAll(['id', 'ownerId', 'name', 'grade', 'academicYear', 'studentCount', 'colorTag', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'ownerId', 'name', 'grade', 'academicYear', 'studentCount', 'scheduleDay', 'scheduleTime', 'colorTag', 'createdAt', 'updatedAt'])
+        && isValidId(data.id)
+        && isValidId(data.ownerId)
+        && data.ownerId == request.auth.uid
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 80
+        && data.grade is string && data.grade.size() >= 1 && data.grade.size() <= 80
+        && data.academicYear is string && data.academicYear.size() >= 4 && data.academicYear.size() <= 32
+        && data.studentCount is int && data.studentCount >= 0 && data.studentCount <= 500
+        && (!('scheduleDay' in data) || (data.scheduleDay is string && data.scheduleDay.size() <= 40))
+        && (!('scheduleTime' in data) || (data.scheduleTime is string && data.scheduleTime.size() <= 40))
+        && data.colorTag is string && data.colorTag.size() >= 1 && data.colorTag.size() <= 32
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidStudent(data) {
+      return data.keys().hasAll(['id', 'ownerId', 'classId', 'studentNumber', 'firstName', 'lastName', 'gender', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'ownerId', 'classId', 'studentNumber', 'firstName', 'lastName', 'gender', 'medicalStatus', 'createdAt', 'updatedAt'])
+        && isValidId(data.id)
+        && isValidId(data.ownerId)
+        && data.ownerId == request.auth.uid
+        && isValidId(data.classId)
+        && data.studentNumber is int && data.studentNumber >= 1 && data.studentNumber <= 500
+        && data.firstName is string && data.firstName.size() >= 1 && data.firstName.size() <= 80
+        && data.lastName is string && data.lastName.size() >= 1 && data.lastName.size() <= 80
+        && data.gender in ['M', 'F']
+        && (!('medicalStatus' in data) || (data.medicalStatus is string && data.medicalStatus.size() <= 160))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidObservation(data) {
+      return data.keys().hasAll(['id', 'ownerId', 'studentId', 'studentName', 'studentNumber', 'classId', 'className', 'type', 'date', 'time', 'timestamp', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'ownerId', 'studentId', 'studentName', 'studentNumber', 'classId', 'className', 'type', 'date', 'time', 'timestamp', 'noteText', 'sessionTopic', 'createdAt', 'updatedAt'])
+        && isValidId(data.id)
+        && isValidId(data.ownerId)
+        && data.ownerId == request.auth.uid
+        && isValidId(data.studentId)
+        && data.studentName is string && data.studentName.size() >= 1 && data.studentName.size() <= 160
+        && data.studentNumber is int && data.studentNumber >= 1 && data.studentNumber <= 500
+        && isValidId(data.classId)
+        && data.className is string && data.className.size() >= 1 && data.className.size() <= 80
+        && data.type in ['absent', 'late', 'no_uniform', 'positive', 'negative', 'dispensed', 'injury']
+        && data.date is string && data.date.size() == 10
+        && data.time is string && data.time.size() >= 5 && data.time.size() <= 12
+        && data.timestamp is int && data.timestamp > 0
+        && (!('noteText' in data) || (data.noteText is string && data.noteText.size() <= 300))
+        && (!('sessionTopic' in data) || (data.sessionTopic is string && data.sessionTopic.size() <= 160))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    // Teacher Workspace Root
+    match /teachers/{teacherId} {
+      allow get: if isValidId(teacherId) && isOwner(teacherId) && existing().ownerId == request.auth.uid;
+      allow list: if isVerifiedUser() && resource.data.ownerId == request.auth.uid;
+      allow create: if isValidId(teacherId)
+        && isOwner(teacherId)
+        && isValidTeacherWorkspace(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(teacherId)
+        && isOwner(teacherId)
+        && isValidTeacherWorkspace(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'schoolName', 'subject', 'academicYear', 'activeSessionTopic', 'updatedAt']);
+      allow delete: if false;
+
+      // Classes subcollection
+      match /classes/{classId} {
+        allow get: if isValidId(teacherId) && isValidId(classId) && isOwner(teacherId) && existing().ownerId == request.auth.uid;
+        allow list: if isVerifiedUser() && teacherId == request.auth.uid && resource.data.ownerId == request.auth.uid;
+        allow create: if isValidId(teacherId)
+          && isValidId(classId)
+          && isOwner(teacherId)
+          && isValidClassGroup(incoming())
+          && incoming().id == classId
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && exists(/databases/$(database)/documents/teachers/$(teacherId))
+          && get(/databases/$(database)/documents/teachers/$(teacherId)).data.ownerId == request.auth.uid;
+        allow update: if isValidId(teacherId)
+          && isValidId(classId)
+          && isOwner(teacherId)
+          && isValidClassGroup(incoming())
+          && incoming().id == existing().id
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && get(/databases/$(database)/documents/teachers/$(teacherId)).data.ownerId == request.auth.uid
+          && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'grade', 'academicYear', 'studentCount', 'scheduleDay', 'scheduleTime', 'colorTag', 'updatedAt']);
+        allow delete: if isValidId(teacherId)
+          && isValidId(classId)
+          && isOwner(teacherId)
+          && existing().ownerId == request.auth.uid
+          && get(/databases/$(database)/documents/teachers/$(teacherId)).data.ownerId == request.auth.uid;
+      }
+
+      // Students subcollection
+      match /students/{studentId} {
+        allow get: if isValidId(teacherId) && isValidId(studentId) && isOwner(teacherId) && existing().ownerId == request.auth.uid;
+        allow list: if isVerifiedUser() && teacherId == request.auth.uid && resource.data.ownerId == request.auth.uid;
+        allow create: if isValidId(teacherId)
+          && isValidId(studentId)
+          && isOwner(teacherId)
+          && isValidStudent(incoming())
+          && incoming().id == studentId
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && exists(/databases/$(database)/documents/teachers/$(teacherId))
+          && get(/databases/$(database)/documents/teachers/$(teacherId)).data.ownerId == request.auth.uid;
+        allow update: if isValidId(teacherId)
+          && isValidId(studentId)
+          && isOwner(teacherId)
+          && isValidStudent(incoming())
+          && incoming().id == existing().id
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && get(/databases/$(database)/documents/teachers/$(teacherId)).data.ownerId == request.auth.uid
+          && incoming().diff(existing()).affectedKeys().hasOnly(['classId', 'studentNumber', 'firstName', 'lastName', 'gender', 'medicalStatus', 'updatedAt']);
+        allow delete: if isValidId(teacherId)
+          && isValidId(studentId)
+          && isOwner(teacherId)
+          && existing().ownerId == request.auth.uid
+          && get(/databases/$(database)/documents/teachers/$(teacherId)).data.ownerId == request.auth.uid;
+      }
+
+      // Observations subcollection
+      match /observations/{observationId} {
+        allow get: if isValidId(teacherId) && isValidId(observationId) && isOwner(teacherId) && existing().ownerId == request.auth.uid;
+        allow list: if isVerifiedUser() && teacherId == request.auth.uid && resource.data.ownerId == request.auth.uid;
+        allow create: if isValidId(teacherId)
+          && isValidId(observationId)
+          && isOwner(teacherId)
+          && isValidObservation(incoming())
+          && incoming().id == observationId
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && exists(/databases/$(database)/documents/teachers/$(teacherId))
+          && get(/databases/$(database)/documents/teachers/$(teacherId)).data.ownerId == request.auth.uid;
+        allow update: if isValidId(teacherId)
+          && isValidId(observationId)
+          && isOwner(teacherId)
+          && isValidObservation(incoming())
+          && incoming().id == existing().id
+          && incoming().ownerId == existing().ownerId
+          && incoming().studentId == existing().studentId
+          && incoming().classId == existing().classId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && get(/databases/$(database)/documents/teachers/$(teacherId)).data.ownerId == request.auth.uid
+          && incoming().diff(existing()).affectedKeys().hasOnly(['type', 'noteText', 'sessionTopic', 'updatedAt']);
+        allow delete: if isValidId(teacherId)
+          && isValidId(observationId)
+          && isOwner(teacherId)
+          && existing().ownerId == request.auth.uid
+          && get(/databases/$(database)/documents/teachers/$(teacherId)).data.ownerId == request.auth.uid;
+      }
+    }
+  }
+}

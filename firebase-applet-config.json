@@ -1,0 +1,12 @@
+{
+  "projectId": "eps-track",
+  "appId": "1:837163399309:web:5b5767f359cb2a6787cac4",
+  "apiKey": "AIzaSyCLT-1hgxH2Qzalw-15EqbJiMx_A_YkK0A",
+  "authDomain": "eps-track.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-epstrack-2d2224e5-2c1c-4793-856c-97b9f4ce8faa",
+  "storageBucket": "eps-track.firebasestorage.app",
+  "messagingSenderId": "837163399309",
+  "measurementId": "",
+  "oAuthClientId": "837163399309-5nqdvuvjfj7q4sk55fd0rd9vhaje96gd.apps.googleusercontent.com",
+  "recaptchaSiteKey": ""
+}
