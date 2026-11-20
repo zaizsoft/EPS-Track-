@@ -4,6 +4,7 @@ import { QuickActionModal } from './QuickActionModal';
 import { GoogleCloudSyncButton } from '../auth/GoogleCloudSyncButton';
 import { observationTypesConfig } from '../../data/mockData';
 import { Student } from '../../types';
+import { getLocalDateStr } from '../../utils/date';
 import { 
   Search, 
   Wifi, 
@@ -56,8 +57,8 @@ export const MobileFieldView: React.FC = () => {
     return classes.filter((c) => c.name.includes(gradeFilter) || c.grade.includes(gradeFilter));
   }, [classes, gradeFilter]);
 
-  // Today's observations for the active class
-  const todayStr = new Date().toISOString().split('T')[0];
+  // Today's observations for the active class (using local calendar date)
+  const todayStr = getLocalDateStr();
 
   const todayClassObservations = useMemo(() => {
     return observations.filter(

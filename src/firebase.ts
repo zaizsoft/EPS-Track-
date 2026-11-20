@@ -9,11 +9,15 @@ import {
 } from 'firebase/auth';
 import {
   getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   doc,
   collection,
   getDoc,
   getDocFromServer,
   getDocs,
+  getDocsFromServer,
   setDoc,
   updateDoc,
   deleteDoc,
@@ -23,12 +27,30 @@ import {
   writeBatch,
   serverTimestamp,
   Unsubscribe,
+  Firestore,
 } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 import { ClassGroup, Student, Observation, TeacherProfile } from './types';
+import { getLocalDateStr, getLocalTimeStr } from './utils/date';
 
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+
+function createFirestoreDb(): Firestore {
+  try {
+    return initializeFirestore(
+      app,
+      {
+        localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+        experimentalAutoDetectLongPolling: true,
+      },
+      firebaseConfig.firestoreDatabaseId
+    );
+  } catch {
+    return getFirestore(app, firebaseConfig.firestoreDatabaseId);
+  }
+}
+
+export const db = createFirestoreDb();
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
@@ -114,12 +136,12 @@ function clampInt(val: number, min: number, max: number): number {
 
 function formatDateYYYYMMDD(raw?: string): string {
   if (raw && raw.length === 10 && /^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
-  return new Date().toISOString().split('T')[0];
+  return getLocalDateStr();
 }
 
 function formatTimeHHMMSS(raw?: string): string {
   if (raw && raw.length >= 5 && raw.length <= 12) return raw;
-  return new Date().toLocaleTimeString('en-GB', { hour12: false });
+  return getLocalTimeStr();
 }
 
 export function onFirebaseAuthChange(callback: (user: User | null) => void): Unsubscribe {
@@ -200,9 +222,11 @@ function buildObservationPayload(uid: string, obs: Observation) {
   return payload;
 }
 
+const workspaceEnsurePromises = new Map<string, Promise<void>>();
+
 /**
- * Ensures the teacher's root workspace exists in Firestore, and seeds initial
- * school classes/students/observations if the cloud workspace is brand new.
+ * Ensures the teacher's root workspace exists in Firestore, and safely seeds
+ * classes/students/observations on first setup without overwriting or racing.
  */
 export async function ensureTeacherWorkspace(
   uid: string,
@@ -212,78 +236,119 @@ export async function ensureTeacherWorkspace(
   students: Student[],
   observations: Observation[]
 ): Promise<void> {
-  const teacherRef = doc(db, 'teachers', uid);
-  const teacherPath = `teachers/${uid}`;
-
-  let teacherExists = false;
-  try {
-    const snap = await getDoc(teacherRef);
-    teacherExists = snap.exists();
-  } catch (err) {
-    handleFirestoreError(err, OperationType.GET, teacherPath);
+  const existingPromise = workspaceEnsurePromises.get(uid);
+  if (existingPromise) {
+    return existingPromise;
   }
 
-  if (!teacherExists) {
+  const runPromise = (async () => {
+    const teacherRef = doc(db, 'teachers', uid);
+    const teacherPath = `teachers/${uid}`;
+
+    let teacherExists = false;
     try {
-      await setDoc(teacherRef, {
-        ...buildTeacherPayload(uid, profile, activeSessionTopic),
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
+      const snap = await getDocFromServer(teacherRef).catch(() => getDoc(teacherRef));
+      teacherExists = snap.exists();
     } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, teacherPath);
+      handleFirestoreError(err, OperationType.GET, teacherPath);
     }
-  }
 
-  // Check if classes already exist for this teacher
-  const classesPath = `teachers/${uid}/classes`;
-  const classesQuery = query(collection(db, classesPath), where('ownerId', '==', uid));
-  let existingClassesCount = 0;
-  try {
-    const clsSnap = await getDocs(classesQuery);
-    existingClassesCount = clsSnap.size;
-  } catch (err) {
-    handleFirestoreError(err, OperationType.LIST, classesPath);
-  }
+    if (!teacherExists) {
+      try {
+        await setDoc(teacherRef, {
+          ...buildTeacherPayload(uid, profile, activeSessionTopic),
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      } catch (err) {
+        handleFirestoreError(err, OperationType.CREATE, teacherPath);
+      }
+    }
 
-  if (existingClassesCount === 0 && classes.length > 0) {
-    // Write classes + students + observations in chunks <= 250 ops
+    const classesPath = `teachers/${uid}/classes`;
+    const studentsPath = `teachers/${uid}/students`;
+    const obsPath = `teachers/${uid}/observations`;
+
+    const existingClassIds = new Set<string>();
+    const existingStudentIds = new Set<string>();
+    let existingObsCount = 0;
+
+    try {
+      const clsSnap = await getDocsFromServer(
+        query(collection(db, classesPath), where('ownerId', '==', uid))
+      ).catch(() => getDocs(query(collection(db, classesPath), where('ownerId', '==', uid))));
+      clsSnap.forEach((d) => existingClassIds.add(d.id));
+    } catch (err) {
+      handleFirestoreError(err, OperationType.LIST, classesPath);
+    }
+
+    try {
+      const stdSnap = await getDocsFromServer(
+        query(collection(db, studentsPath), where('ownerId', '==', uid))
+      ).catch(() => getDocs(query(collection(db, studentsPath), where('ownerId', '==', uid))));
+      stdSnap.forEach((d) => existingStudentIds.add(d.id));
+    } catch (err) {
+      handleFirestoreError(err, OperationType.LIST, studentsPath);
+    }
+
+    if (!teacherExists) {
+      try {
+        const obsSnap = await getDocsFromServer(
+          query(collection(db, obsPath), where('ownerId', '==', uid))
+        ).catch(() => getDocs(query(collection(db, obsPath), where('ownerId', '==', uid))));
+        existingObsCount = obsSnap.size;
+      } catch (err) {
+        handleFirestoreError(err, OperationType.LIST, obsPath);
+      }
+    }
+
     const operations: Array<{ ref: ReturnType<typeof doc>; data: Record<string, unknown> }> = [];
 
-    for (const cls of classes) {
-      const id = sanitizeId(cls.id, 'cls');
-      operations.push({
-        ref: doc(db, 'teachers', uid, 'classes', id),
-        data: {
-          ...buildClassPayload(uid, { ...cls, id }),
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        },
-      });
+    if (existingClassIds.size === 0 && classes.length > 0) {
+      for (const cls of classes) {
+        const id = sanitizeId(cls.id, 'cls');
+        if (!existingClassIds.has(id)) {
+          operations.push({
+            ref: doc(db, 'teachers', uid, 'classes', id),
+            data: {
+              ...buildClassPayload(uid, { ...cls, id }),
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+            },
+          });
+        }
+      }
     }
 
-    for (const st of students) {
-      const id = sanitizeId(st.id, 'std');
-      operations.push({
-        ref: doc(db, 'teachers', uid, 'students', id),
-        data: {
-          ...buildStudentPayload(uid, { ...st, id }),
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        },
-      });
+    if (existingStudentIds.size === 0 && students.length > 0) {
+      for (const st of students) {
+        const id = sanitizeId(st.id, 'std');
+        if (!existingStudentIds.has(id)) {
+          operations.push({
+            ref: doc(db, 'teachers', uid, 'students', id),
+            data: {
+              ...buildStudentPayload(uid, { ...st, id }),
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+            },
+          });
+        }
+      }
     }
 
-    for (const obs of observations) {
-      const id = sanitizeId(obs.id, 'obs');
-      operations.push({
-        ref: doc(db, 'teachers', uid, 'observations', id),
-        data: {
-          ...buildObservationPayload(uid, { ...obs, id }),
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        },
-      });
+    // Only seed initial sample observations when workspace is brand new
+    if (!teacherExists && existingClassIds.size === 0 && existingObsCount === 0 && observations.length > 0) {
+      for (const obs of observations) {
+        const id = sanitizeId(obs.id, 'obs');
+        operations.push({
+          ref: doc(db, 'teachers', uid, 'observations', id),
+          data: {
+            ...buildObservationPayload(uid, { ...obs, id }),
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          },
+        });
+      }
     }
 
     const CHUNK_SIZE = 240;
@@ -299,15 +364,21 @@ export async function ensureTeacherWorkspace(
         handleFirestoreError(err, OperationType.WRITE, `teachers/${uid}/batch`);
       }
     }
-  }
+  })().finally(() => {
+    workspaceEnsurePromises.delete(uid);
+  });
+
+  workspaceEnsurePromises.set(uid, runPromise);
+  return runPromise;
 }
 
 export interface TeacherSyncCallbacks {
   onWorkspace: (profile: TeacherProfile, activeSessionTopic?: string) => void;
   onClasses: (classes: ClassGroup[]) => void;
   onStudents: (students: Student[]) => void;
-  onObservations: (observations: Observation[]) => void;
-  onSyncStatus?: (connected: boolean) => void;
+  onObservations: (observations: Observation[], hasPendingWrites: boolean, fromCache: boolean) => void;
+  onSyncStatus?: (connected: boolean, hasPendingWrites?: boolean) => void;
+  onError?: (errorMessage: string) => void;
 }
 
 export function subscribeToTeacherData(
@@ -321,8 +392,9 @@ export function subscribeToTeacherData(
 
   const unsubTeacher = onSnapshot(
     doc(db, 'teachers', uid),
+    { includeMetadataChanges: true },
     (snapshot) => {
-      callbacks.onSyncStatus?.(true);
+      callbacks.onSyncStatus?.(true, snapshot.metadata.hasPendingWrites);
       if (snapshot.exists()) {
         const d = snapshot.data();
         callbacks.onWorkspace(
@@ -338,14 +410,21 @@ export function subscribeToTeacherData(
     },
     (error) => {
       callbacks.onSyncStatus?.(false);
-      handleFirestoreError(error, OperationType.GET, teacherPath);
+      const msg = error instanceof Error ? error.message : String(error);
+      callbacks.onError?.(msg);
+      try {
+        handleFirestoreError(error, OperationType.GET, teacherPath);
+      } catch {
+        // Error already logged and surfaced via onError
+      }
     }
   );
 
   const unsubClasses = onSnapshot(
     query(collection(db, classesPath), where('ownerId', '==', uid)),
+    { includeMetadataChanges: true },
     (snapshot) => {
-      if (!snapshot.empty) {
+      if (!snapshot.empty || !snapshot.metadata.fromCache) {
         const list: ClassGroup[] = snapshot.docs.map((docSnap) => {
           const d = docSnap.data();
           return {
@@ -360,18 +439,27 @@ export function subscribeToTeacherData(
           };
         });
         list.sort((a, b) => a.id.localeCompare(b.id));
-        callbacks.onClasses(list);
+        if (list.length > 0) {
+          callbacks.onClasses(list);
+        }
       }
     },
     (error) => {
-      handleFirestoreError(error, OperationType.LIST, classesPath);
+      const msg = error instanceof Error ? error.message : String(error);
+      callbacks.onError?.(msg);
+      try {
+        handleFirestoreError(error, OperationType.LIST, classesPath);
+      } catch {
+        // Error already logged and surfaced via onError
+      }
     }
   );
 
   const unsubStudents = onSnapshot(
     query(collection(db, studentsPath), where('ownerId', '==', uid)),
+    { includeMetadataChanges: true },
     (snapshot) => {
-      if (!snapshot.empty) {
+      if (!snapshot.empty || !snapshot.metadata.fromCache) {
         const list: Student[] = snapshot.docs.map((docSnap) => {
           const d = docSnap.data();
           return {
@@ -384,17 +472,31 @@ export function subscribeToTeacherData(
             medicalStatus: d.medicalStatus,
           };
         });
-        callbacks.onStudents(list);
+        if (list.length > 0 || !snapshot.metadata.fromCache) {
+          callbacks.onStudents(list);
+        }
       }
     },
     (error) => {
-      handleFirestoreError(error, OperationType.LIST, studentsPath);
+      const msg = error instanceof Error ? error.message : String(error);
+      callbacks.onError?.(msg);
+      try {
+        handleFirestoreError(error, OperationType.LIST, studentsPath);
+      } catch {
+        // Error already logged and surfaced via onError
+      }
     }
   );
 
   const unsubObservations = onSnapshot(
     query(collection(db, obsPath), where('ownerId', '==', uid)),
+    { includeMetadataChanges: true },
     (snapshot) => {
+      // Avoid flashing empty cache before server responds on fresh device login
+      if (snapshot.empty && snapshot.metadata.fromCache) {
+        return;
+      }
+
       const list: Observation[] = snapshot.docs.map((docSnap) => {
         const d = docSnap.data();
         return {
@@ -410,14 +512,24 @@ export function subscribeToTeacherData(
           timestamp: d.timestamp,
           noteText: d.noteText,
           sessionTopic: d.sessionTopic,
-          synced: true,
+          synced: !docSnap.metadata.hasPendingWrites,
         };
       });
       list.sort((a, b) => b.timestamp - a.timestamp);
-      callbacks.onObservations(list);
+      callbacks.onObservations(
+        list,
+        snapshot.metadata.hasPendingWrites,
+        snapshot.metadata.fromCache
+      );
     },
     (error) => {
-      handleFirestoreError(error, OperationType.LIST, obsPath);
+      const msg = error instanceof Error ? error.message : String(error);
+      callbacks.onError?.(msg);
+      try {
+        handleFirestoreError(error, OperationType.LIST, obsPath);
+      } catch {
+        // Error already logged and surfaced via onError
+      }
     }
   );
 
@@ -429,11 +541,128 @@ export function subscribeToTeacherData(
   };
 }
 
+/**
+ * Forces an authoritative server fetch for all collections to guarantee identical counts across devices.
+ */
+export async function fetchAllTeacherDataFromServer(uid: string): Promise<{
+  profile?: TeacherProfile;
+  activeSessionTopic?: string;
+  classes: ClassGroup[];
+  students: Student[];
+  observations: Observation[];
+}> {
+  const teacherPath = `teachers/${uid}`;
+  const classesPath = `teachers/${uid}/classes`;
+  const studentsPath = `teachers/${uid}/students`;
+  const obsPath = `teachers/${uid}/observations`;
+
+  let profile: TeacherProfile | undefined;
+  let activeSessionTopic: string | undefined;
+
+  try {
+    const tSnap = await getDocFromServer(doc(db, 'teachers', uid));
+    if (tSnap.exists()) {
+      const d = tSnap.data();
+      profile = {
+        name: d.name,
+        schoolName: d.schoolName,
+        subject: d.subject,
+        academicYear: d.academicYear,
+      };
+      activeSessionTopic = d.activeSessionTopic;
+    }
+  } catch (err) {
+    handleFirestoreError(err, OperationType.GET, teacherPath);
+  }
+
+  const classes: ClassGroup[] = [];
+  try {
+    const clsSnap = await getDocsFromServer(
+      query(collection(db, classesPath), where('ownerId', '==', uid))
+    );
+    clsSnap.forEach((docSnap) => {
+      const d = docSnap.data();
+      classes.push({
+        id: d.id,
+        name: d.name,
+        grade: d.grade,
+        academicYear: d.academicYear,
+        studentCount: d.studentCount,
+        scheduleDay: d.scheduleDay,
+        scheduleTime: d.scheduleTime,
+        colorTag: d.colorTag,
+      });
+    });
+    classes.sort((a, b) => a.id.localeCompare(b.id));
+  } catch (err) {
+    handleFirestoreError(err, OperationType.LIST, classesPath);
+  }
+
+  const students: Student[] = [];
+  try {
+    const stdSnap = await getDocsFromServer(
+      query(collection(db, studentsPath), where('ownerId', '==', uid))
+    );
+    stdSnap.forEach((docSnap) => {
+      const d = docSnap.data();
+      students.push({
+        id: d.id,
+        classId: d.classId,
+        studentNumber: d.studentNumber,
+        firstName: d.firstName,
+        lastName: d.lastName,
+        gender: d.gender,
+        medicalStatus: d.medicalStatus,
+      });
+    });
+  } catch (err) {
+    handleFirestoreError(err, OperationType.LIST, studentsPath);
+  }
+
+  const observations: Observation[] = [];
+  try {
+    const obsSnap = await getDocsFromServer(
+      query(collection(db, obsPath), where('ownerId', '==', uid))
+    );
+    obsSnap.forEach((docSnap) => {
+      const d = docSnap.data();
+      observations.push({
+        id: d.id,
+        studentId: d.studentId,
+        studentName: d.studentName,
+        studentNumber: d.studentNumber,
+        classId: d.classId,
+        className: d.className,
+        type: d.type,
+        date: d.date,
+        time: d.time,
+        timestamp: d.timestamp,
+        noteText: d.noteText,
+        sessionTopic: d.sessionTopic,
+        synced: true,
+      });
+    });
+    observations.sort((a, b) => b.timestamp - a.timestamp);
+  } catch (err) {
+    handleFirestoreError(err, OperationType.LIST, obsPath);
+  }
+
+  return { profile, activeSessionTopic, classes, students, observations };
+}
+
 export async function pushObservationToFirestore(uid: string, obs: Observation): Promise<void> {
   const id = sanitizeId(obs.id, 'obs');
   const path = `teachers/${uid}/observations/${id}`;
+  const obsRef = doc(db, 'teachers', uid, 'observations', id);
+
   try {
-    await setDoc(doc(db, 'teachers', uid, 'observations', id), {
+    const existingSnap = await getDoc(obsRef);
+    if (existingSnap.exists()) {
+      // Document already synced on a prior attempt
+      return;
+    }
+
+    await setDoc(obsRef, {
       ...buildObservationPayload(uid, { ...obs, id }),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),

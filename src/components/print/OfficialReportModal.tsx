@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { observationTypesConfig } from '../../data/mockData';
+import { getLocalDateStr } from '../../utils/date';
 import { Printer, X, FileText, CheckCircle2, ListFilter, Sliders } from 'lucide-react';
 
 interface OfficialReportModalProps {
@@ -27,7 +28,7 @@ export const OfficialReportModal: React.FC<OfficialReportModalProps> = ({
     .filter((s) => s.classId === currentClass.id)
     .sort((a, b) => a.studentNumber - b.studentNumber);
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getLocalDateStr();
   const todayObservations = observations.filter(
     (o) => o.classId === currentClass.id && o.date === todayStr
   );

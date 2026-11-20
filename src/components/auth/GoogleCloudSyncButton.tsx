@@ -14,6 +14,8 @@ export const GoogleCloudSyncButton: React.FC<GoogleCloudSyncButtonProps> = ({ co
     logoutFromGoogle,
     cloudState,
     cloudError,
+    pendingSyncCount,
+    syncNowFromCloud,
     isSyncing,
     theme,
   } = useApp();
@@ -122,17 +124,19 @@ export const GoogleCloudSyncButton: React.FC<GoogleCloudSyncButtonProps> = ({ co
 
   return (
     <div className="inline-flex items-center gap-1.5">
-      <div
+      <button
         id="google-cloud-status-pill"
-        className={`inline-flex items-center gap-2 rounded-xl border font-bold transition-all ${
+        type="button"
+        onClick={() => void syncNowFromCloud()}
+        className={`inline-flex items-center gap-2 rounded-xl border font-bold transition-all active:scale-95 ${
           compact ? 'px-2.5 py-1 text-[11px]' : 'px-3 py-1.5 text-xs'
         } ${
           isSyncing
             ? 'sync-blinking-pulse ring-2 ring-emerald-400/70 bg-emerald-600/20 text-emerald-500 border-emerald-400/80'
             : cloudState === 'connected'
               ? isDark
-                ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-300'
-                : 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-300 hover:bg-emerald-900/60'
+                : 'bg-emerald-50 border-emerald-300 text-emerald-800 hover:bg-emerald-100'
               : cloudState === 'error'
                 ? isDark
                   ? 'bg-rose-950/60 border-rose-500/40 text-rose-300'
@@ -141,7 +145,7 @@ export const GoogleCloudSyncButton: React.FC<GoogleCloudSyncButtonProps> = ({ co
                   ? 'bg-slate-800 border-slate-700 text-slate-300'
                   : 'bg-slate-100 border-slate-300 text-slate-700'
         }`}
-        title={`Google Cloud Firestore • ${authUser.email || authUser.displayName || ''}`}
+        title={`اضغط للمزامنة الفورية • ${authUser.email || authUser.displayName || ''}`}
       >
         <RefreshCw
           className={`w-3.5 h-3.5 shrink-0 ${
@@ -153,12 +157,14 @@ export const GoogleCloudSyncButton: React.FC<GoogleCloudSyncButtonProps> = ({ co
           }`}
         />
 
-        <span className="truncate max-w-[110px] sm:max-w-[170px]">
+        <span className="truncate max-w-[115px] sm:max-w-[180px]">
           {isSyncing
             ? 'جاري المزامنة...'
-            : compact
-              ? authUser.displayName?.split(' ')[0] || 'متصل Google'
-              : `Google: ${authUser.displayName || authUser.email || 'متصل'}`}
+            : pendingSyncCount > 0
+              ? `معلق (${pendingSyncCount})`
+              : compact
+                ? authUser.displayName?.split(' ')[0] || 'متصل Google'
+                : `Google: ${authUser.displayName || authUser.email || 'متصل'}`}
         </span>
 
         <span
@@ -172,7 +178,7 @@ export const GoogleCloudSyncButton: React.FC<GoogleCloudSyncButtonProps> = ({ co
                   : 'bg-slate-400'
           }`}
         />
-      </div>
+      </button>
 
       <button
         type="button"

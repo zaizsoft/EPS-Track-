@@ -5,6 +5,7 @@ import { ObservationType, Student } from '../../types';
 import { ImportStudentsModal } from './ImportStudentsModal';
 import { OfficialReportModal } from '../print/OfficialReportModal';
 import { GoogleCloudSyncButton } from '../auth/GoogleCloudSyncButton';
+import { getLocalDateStr } from '../../utils/date';
 import { 
   Users, 
   UserX, 
@@ -41,7 +42,9 @@ export const DesktopDashboard: React.FC = () => {
     teacherProfile,
     theme,
     toggleTheme,
-    resetToDefaultData
+    resetToDefaultData,
+    authUser,
+    isSyncing
   } = useApp();
 
   const isDark = theme === 'dark';
@@ -76,11 +79,15 @@ export const DesktopDashboard: React.FC = () => {
     });
   }, [observations, classFilter, selectedTypeFilter, dateFilter, searchQuery]);
 
-  // Overall statistics
+  // Overall & today's live statistics
+  const todayStr = getLocalDateStr();
   const totalStudentsCount = students.length;
   const totalAbsences = observations.filter((o) => o.type === 'absent').length;
+  const todayAbsences = observations.filter((o) => o.type === 'absent' && o.date === todayStr).length;
   const totalDelays = observations.filter((o) => o.type === 'late').length;
+  const todayDelays = observations.filter((o) => o.type === 'late' && o.date === todayStr).length;
   const totalNoUniform = observations.filter((o) => o.type === 'no_uniform').length;
+  const todayNoUniform = observations.filter((o) => o.type === 'no_uniform' && o.date === todayStr).length;
   const totalPositive = observations.filter((o) => o.type === 'positive').length;
   const totalNegative = observations.filter((o) => o.type === 'negative').length;
 
@@ -109,7 +116,7 @@ export const DesktopDashboard: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `سجل_التربية_البدنية_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute("download", `سجل_التربية_البدنية_${getLocalDateStr()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -216,7 +223,7 @@ export const DesktopDashboard: React.FC = () => {
             {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-700" />}
           </button>
 
-          {/* Reset Local Cache */}
+          {/* Refresh from Cloud or Reset Local Cache */}
           <button
             onClick={resetToDefaultData}
             className={`p-2 rounded-xl border text-xs font-medium flex items-center gap-1 transition-all ${
@@ -224,9 +231,9 @@ export const DesktopDashboard: React.FC = () => {
                 ? 'bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-slate-200 border-slate-700/80' 
                 : 'bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 border-slate-200'
             }`}
-            title="استعادة القوائم الأولية الافتراضية"
+            title={authUser ? 'مزامنة فورية من الخادم السحابي' : 'استعادة القوائم الأولية الافتراضية'}
           >
-            <RefreshCcw className="w-4 h-4" />
+            <RefreshCcw className={`w-4 h-4 ${isSyncing && authUser ? 'animate-spin text-emerald-400' : ''}`} />
           </button>
         </div>
       </header>
@@ -254,7 +261,7 @@ export const DesktopDashboard: React.FC = () => {
             <UserX className="w-4 h-4 text-red-500" />
           </div>
           <div className={`text-2xl font-black ${isDark ? 'text-red-300' : 'text-red-700'}`}>{totalAbsences}</div>
-          <div className="text-[10px] text-red-500/80 mt-1">حالة مسجلة</div>
+          <div className="text-[10px] text-red-500/80 mt-1">اليوم: {todayAbsences} • الإجمالي مسجل</div>
         </div>
 
         {/* Delays */}
@@ -266,7 +273,7 @@ export const DesktopDashboard: React.FC = () => {
             <Clock className="w-4 h-4 text-amber-500" />
           </div>
           <div className={`text-2xl font-black ${isDark ? 'text-amber-300' : 'text-amber-800'}`}>{totalDelays}</div>
-          <div className="text-[10px] text-amber-500/80 mt-1">دخول متأخر</div>
+          <div className="text-[10px] text-amber-500/80 mt-1">اليوم: {todayDelays} • دخول متأخر</div>
         </div>
 
         {/* No Uniform */}
@@ -278,7 +285,7 @@ export const DesktopDashboard: React.FC = () => {
             <Shirt className="w-4 h-4 text-violet-500" />
           </div>
           <div className={`text-2xl font-black ${isDark ? 'text-violet-300' : 'text-violet-800'}`}>{totalNoUniform}</div>
-          <div className="text-[10px] text-violet-500/80 mt-1">Sans Tenue</div>
+          <div className="text-[10px] text-violet-500/80 mt-1">اليوم: {todayNoUniform} • Sans Tenue</div>
         </div>
 
         {/* Positive Points */}

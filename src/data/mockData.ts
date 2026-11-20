@@ -1,4 +1,5 @@
 import { ClassGroup, Student, Observation, TeacherProfile } from '../types';
+import { getLocalDateStr } from '../utils/date';
 
 export const initialTeacherProfile: TeacherProfile = {
   name: "الأستاذ: الزايز محمد الطاهر",
@@ -451,7 +452,7 @@ export const initialObservations: Observation[] = [
     classId: "cls-1ap-a",
     className: "السنة 1 (أ)",
     type: "positive",
-    date: new Date().toISOString().split('T')[0],
+    date: getLocalDateStr(),
     time: "08:14:22",
     timestamp: Date.now() - 1000 * 60 * 35,
     noteText: "نشاط متميز وتفاعل حركي ممتاز في ألعاب التوازن",
@@ -466,7 +467,7 @@ export const initialObservations: Observation[] = [
     classId: "cls-1ap-a",
     className: "السنة 1 (أ)",
     type: "no_uniform",
-    date: new Date().toISOString().split('T')[0],
+    date: getLocalDateStr(),
     time: "08:05:10",
     timestamp: Date.now() - 1000 * 60 * 45,
     noteText: "حضر بحذاء عادي بدون بدلة رياضية",
@@ -481,7 +482,7 @@ export const initialObservations: Observation[] = [
     classId: "cls-1ap-a",
     className: "السنة 1 (أ)",
     type: "absent",
-    date: new Date().toISOString().split('T')[0],
+    date: getLocalDateStr(),
     time: "08:02:15",
     timestamp: Date.now() - 1000 * 60 * 50,
     noteText: "غياب عن الحصة الصباحية عند المناداة الأولى",
@@ -496,7 +497,7 @@ export const initialObservations: Observation[] = [
     classId: "cls-1ap-a",
     className: "السنة 1 (أ)",
     type: "late",
-    date: new Date().toISOString().split('T')[0],
+    date: getLocalDateStr(),
     time: "08:18:40",
     timestamp: Date.now() - 1000 * 60 * 30,
     noteText: "تأخر 15 دقيقة مع انطلاق الحصة",
@@ -511,7 +512,7 @@ export const initialObservations: Observation[] = [
     classId: "cls-1ap-a",
     className: "السنة 1 (أ)",
     type: "positive",
-    date: new Date().toISOString().split('T')[0],
+    date: getLocalDateStr(),
     time: "08:35:00",
     timestamp: Date.now() - 1000 * 60 * 15,
     noteText: "مساعدة الزملاء في ترتيب العتاد والكرات",
