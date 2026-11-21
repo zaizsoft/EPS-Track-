@@ -15,8 +15,8 @@ export const initialClasses: ClassGroup[] = [
     grade: "السنة الأولى ابتدائي",
     academicYear: "2026/2027",
     studentCount: 25,
-    scheduleDay: "الأحد",
-    scheduleTime: "08:00 - 09:30",
+    scheduleDay: "الاثنين / الأربعاء",
+    scheduleTime: "13:00 - 14:00",
     colorTag: "emerald"
   },
   {
@@ -25,8 +25,8 @@ export const initialClasses: ClassGroup[] = [
     grade: "السنة الأولى ابتدائي",
     academicYear: "2026/2027",
     studentCount: 25,
-    scheduleDay: "الأحد",
-    scheduleTime: "09:30 - 11:00",
+    scheduleDay: "الاثنين 16:00 / الخميس 13:00",
+    scheduleTime: "13:00 - 17:00",
     colorTag: "teal"
   },
   {
@@ -35,8 +35,8 @@ export const initialClasses: ClassGroup[] = [
     grade: "السنة الثانية ابتدائي",
     academicYear: "2026/2027",
     studentCount: 34,
-    scheduleDay: "الإثنين",
-    scheduleTime: "08:00 - 09:30",
+    scheduleDay: "الاثنين 09:30 / الأربعاء 14:00",
+    scheduleTime: "09:30 - 15:00",
     colorTag: "blue"
   },
   {
@@ -45,8 +45,8 @@ export const initialClasses: ClassGroup[] = [
     grade: "السنة الثانية ابتدائي",
     academicYear: "2026/2027",
     studentCount: 31,
-    scheduleDay: "الإثنين",
-    scheduleTime: "09:30 - 11:00",
+    scheduleDay: "الأحد / الأربعاء",
+    scheduleTime: "12:00 - 13:00",
     colorTag: "indigo"
   },
   {
@@ -55,8 +55,8 @@ export const initialClasses: ClassGroup[] = [
     grade: "السنة الثالثة ابتدائي",
     academicYear: "2026/2027",
     studentCount: 27,
-    scheduleDay: "الثلاثاء",
-    scheduleTime: "08:00 - 09:30",
+    scheduleDay: "الأحد 09:30 / الاثنين 14:00",
+    scheduleTime: "09:30 - 15:00",
     colorTag: "amber"
   },
   {
@@ -65,8 +65,8 @@ export const initialClasses: ClassGroup[] = [
     grade: "السنة الثالثة ابتدائي",
     academicYear: "2026/2027",
     studentCount: 23,
-    scheduleDay: "الثلاثاء",
-    scheduleTime: "09:30 - 11:00",
+    scheduleDay: "الأحد 10:30 / الأربعاء 16:00",
+    scheduleTime: "10:30 - 17:00",
     colorTag: "orange"
   },
   {
@@ -75,7 +75,7 @@ export const initialClasses: ClassGroup[] = [
     grade: "السنة الرابعة ابتدائي",
     academicYear: "2026/2027",
     studentCount: 35,
-    scheduleDay: "الأربعاء",
+    scheduleDay: "الأحد",
     scheduleTime: "08:00 - 09:30",
     colorTag: "rose"
   },
@@ -85,8 +85,8 @@ export const initialClasses: ClassGroup[] = [
     grade: "السنة الرابعة ابتدائي",
     academicYear: "2026/2027",
     studentCount: 28,
-    scheduleDay: "الأربعاء",
-    scheduleTime: "09:30 - 11:00",
+    scheduleDay: "الاثنين",
+    scheduleTime: "10:30 - 12:00",
     colorTag: "pink"
   },
   {
@@ -96,7 +96,7 @@ export const initialClasses: ClassGroup[] = [
     academicYear: "2026/2027",
     studentCount: 30,
     scheduleDay: "الخميس",
-    scheduleTime: "08:00 - 09:30",
+    scheduleTime: "14:00 - 15:00",
     colorTag: "violet"
   },
   {
@@ -106,7 +106,7 @@ export const initialClasses: ClassGroup[] = [
     academicYear: "2026/2027",
     studentCount: 32,
     scheduleDay: "الخميس",
-    scheduleTime: "09:30 - 11:00",
+    scheduleTime: "16:00 - 17:00",
     colorTag: "purple"
   }
 ];

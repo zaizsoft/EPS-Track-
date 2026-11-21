@@ -39,6 +39,7 @@ import {
   importStudentsBatchToFirestore,
 } from '../firebase';
 import { getLocalDateStr, getLocalTimeStr } from '../utils/date';
+import { CurrentScheduleStatus, getCurrentScheduleStatus } from '../data/scheduleData';
 
 type PendingOp =
   | { type: 'add_obs'; observation: Observation }
@@ -50,6 +51,10 @@ interface AppContextType {
   observations: Observation[];
   activeClassId: string;
   setActiveClassId: (id: string) => void;
+  scheduleStatus: CurrentScheduleStatus;
+  hasManualClassSelection: boolean;
+  clearManualClassSelection: () => void;
+  followLiveSchedule: () => void;
   activeSessionTopic: string;
   setActiveSessionTopic: (topic: string) => void;
   teacherProfile: TeacherProfile;
@@ -156,7 +161,63 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     safeParseJson(localStorage.getItem(PENDING_OPS_KEY), [])
   );
 
-  const [activeClassId, setActiveClassId] = useState<string>(classes[0]?.id || 'cls-1ap-a');
+  const [scheduleStatus, setScheduleStatus] = useState<CurrentScheduleStatus>(() =>
+    getCurrentScheduleStatus()
+  );
+  const [hasManualClassSelection, setHasManualClassSelection] = useState<boolean>(false);
+  const lastAutoSlotIdRef = useRef<string | null>(scheduleStatus.activeSlot?.id ?? null);
+
+  const [activeClassId, setActiveClassIdState] = useState<string>(
+    () => scheduleStatus.activeSlot?.classId || classes[0]?.id || 'cls-1ap-a'
+  );
+
+  const setActiveClassId = useCallback((id: string) => {
+    setHasManualClassSelection(true);
+    setActiveClassIdState(id);
+  }, []);
+
+  const clearManualClassSelection = useCallback(() => {
+    setHasManualClassSelection(false);
+  }, []);
+
+  const followLiveSchedule = useCallback(() => {
+    const latest = getCurrentScheduleStatus();
+    setScheduleStatus(latest);
+    setHasManualClassSelection(false);
+    if (latest.activeSlot) {
+      lastAutoSlotIdRef.current = latest.activeSlot.id;
+      setActiveClassIdState(latest.activeSlot.classId);
+    }
+  }, []);
+
+  // Keep schedule clock synchronized every 30s and whenever user returns to app
+  useEffect(() => {
+    const refreshSchedule = () => {
+      const latest = getCurrentScheduleStatus();
+      setScheduleStatus(latest);
+      const nextSlotId = latest.activeSlot?.id ?? null;
+
+      if (latest.activeSlot && nextSlotId !== lastAutoSlotIdRef.current) {
+        // A new scheduled session just started — automatically switch to it
+        lastAutoSlotIdRef.current = nextSlotId;
+        setHasManualClassSelection(false);
+        setActiveClassIdState(latest.activeSlot.classId);
+      } else if (!latest.activeSlot && lastAutoSlotIdRef.current !== null) {
+        // Previous session ended
+        lastAutoSlotIdRef.current = null;
+      }
+    };
+
+    const interval = setInterval(refreshSchedule, 30000);
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') refreshSchedule();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, []);
   const [activeSessionTopic, setActiveSessionTopicState] = useState<string>(
     'ألعاب القوى المصغرة - التوازن والتنقل'
   );
@@ -809,6 +870,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         observations,
         activeClassId,
         setActiveClassId,
+        scheduleStatus,
+        hasManualClassSelection,
+        clearManualClassSelection,
+        followLiveSchedule,
         activeSessionTopic,
         setActiveSessionTopic,
         teacherProfile,

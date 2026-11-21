@@ -5,6 +5,7 @@ import { ObservationType, Student } from '../../types';
 import { ImportStudentsModal } from './ImportStudentsModal';
 import { OfficialReportModal } from '../print/OfficialReportModal';
 import { GoogleCloudSyncButton } from '../auth/GoogleCloudSyncButton';
+import { OFFICIAL_TIMETABLE } from '../../data/scheduleData';
 import { getLocalDateStr } from '../../utils/date';
 import { 
   Users, 
@@ -26,7 +27,9 @@ import {
   Sparkles,
   Plus,
   Sun,
-  Moon
+  Moon,
+  CalendarClock,
+  ArrowLeft
 } from 'lucide-react';
 
 export const DesktopDashboard: React.FC = () => {
@@ -44,12 +47,17 @@ export const DesktopDashboard: React.FC = () => {
     toggleTheme,
     resetToDefaultData,
     authUser,
-    isSyncing
+    isSyncing,
+    scheduleStatus,
+    followLiveSchedule
   } = useApp();
 
   const isDark = theme === 'dark';
 
-  const [activeTab, setActiveTab] = useState<'feed' | 'roster' | 'analytics'>('feed');
+  // When opened on Desktop: if there's an active scheduled session, default to 'roster' showing those students!
+  const [activeTab, setActiveTab] = useState<'feed' | 'roster' | 'analytics' | 'schedule'>(() =>
+    scheduleStatus.activeSlot ? 'roster' : 'feed'
+  );
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>('all');
   const [classFilter, setClassFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -238,6 +246,119 @@ export const DesktopDashboard: React.FC = () => {
         </div>
       </header>
 
+      {/* Live Official Timetable Banner (Desktop) */}
+      <div className={`border rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors ${
+        scheduleStatus.activeSlot
+          ? isDark
+            ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-100'
+            : 'bg-emerald-50 border-emerald-300 text-emerald-950'
+          : isDark
+            ? 'bg-amber-950/25 border-amber-500/30 text-amber-100'
+            : 'bg-amber-50 border-amber-200 text-amber-950'
+      }`}>
+        {scheduleStatus.activeSlot ? (
+          <>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0">
+                <CalendarClock className="w-5 h-5 text-emerald-500" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="inline-flex items-center gap-1.5 text-xs font-black text-emerald-500">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    الحصة الجارية الآن حسب الجدول الرسمي:
+                  </span>
+                  <span className="text-sm font-black">
+                    {scheduleStatus.activeSlot.levelLabel} {scheduleStatus.activeSlot.groupLabel}
+                  </span>
+                </div>
+                <p className={`text-xs font-mono mt-0.5 ${isDark ? 'text-emerald-300/80' : 'text-emerald-800'}`}>
+                  {scheduleStatus.activeSlot.dayLabelAr} • {scheduleStatus.activeSlot.startTime} - {scheduleStatus.activeSlot.endTime}
+                  {scheduleStatus.remainingMinutes !== null && ` • متبقي ${scheduleStatus.remainingMinutes} دقيقة`}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  followLiveSchedule();
+                  setActiveTab('roster');
+                }}
+                className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm"
+              >
+                <Users className="w-4 h-4" />
+                <span>عرض تلاميذ الحصة الآن</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('schedule')}
+                className={`px-3 py-2 rounded-xl border text-xs font-bold ${
+                  isDark ? 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700' : 'bg-white border-emerald-300 text-emerald-900 hover:bg-emerald-100'
+                }`}
+              >
+                الجدول الكامل
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0">
+                <Clock className="w-5 h-5 text-amber-500" />
+              </div>
+              <div>
+                <div className="text-xs font-black text-amber-500">
+                  لا توجد حصة مبرمجة في التوقيت الحالي ({scheduleStatus.currentDayLabelAr} {scheduleStatus.currentTimeStr})
+                </div>
+                <p className={`text-xs mt-0.5 ${isDark ? 'text-amber-200/80' : 'text-amber-900'}`}>
+                  {scheduleStatus.nextTodaySlot
+                    ? `الحصة القادمة اليوم: ${scheduleStatus.nextTodaySlot.startTime} — ${scheduleStatus.nextTodaySlot.levelLabel} ${scheduleStatus.nextTodaySlot.groupLabel}`
+                    : 'يمكنك اختيار أي قسم من القائمة للانتقال مباشرة إلى تلاميذه.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap shrink-0">
+              <select
+                value={activeClassId}
+                onChange={(e) => {
+                  setActiveClassId(e.target.value);
+                  setActiveTab('roster');
+                }}
+                className={`border rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:border-emerald-500 ${
+                  isDark ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-amber-300 text-slate-900'
+                }`}
+              >
+                {classes.map((cls) => (
+                  <option key={cls.id} value={cls.id}>
+                    الانتقال إلى: {cls.name} ({cls.studentCount} تلميذ)
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => setActiveTab('roster')}
+                className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black flex items-center gap-1.5"
+              >
+                <span>فتح القسم</span>
+                <ArrowLeft className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('schedule')}
+                className={`px-3 py-2 rounded-xl border text-xs font-bold ${
+                  isDark ? 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700' : 'bg-white border-amber-300 text-amber-900 hover:bg-amber-100'
+                }`}
+              >
+                جدول الحصص
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+
       {/* KPI Metrics Summary Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {/* Total Students */}
@@ -360,6 +481,20 @@ export const DesktopDashboard: React.FC = () => {
         >
           <TrendingUp className="w-3.5 h-3.5" />
           <span>تحليلات الانضباط والحضور (Analytics)</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('schedule')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors flex items-center gap-2 ${
+            activeTab === 'schedule'
+              ? 'bg-emerald-600 text-white shadow-md'
+              : isDark
+              ? 'bg-slate-800/80 text-slate-400 hover:text-white'
+              : 'bg-slate-100 text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <CalendarClock className="w-3.5 h-3.5" />
+          <span>جدول توزيع الحصص الرسمي</span>
         </button>
       </div>
 
@@ -807,6 +942,96 @@ export const DesktopDashboard: React.FC = () => {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 4: Official Weekly Timetable */}
+      {activeTab === 'schedule' && (
+        <div className={`border rounded-2xl overflow-hidden shadow-sm ${
+          isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+        }`}>
+          <div className={`p-4 border-b flex items-center justify-between ${
+            isDark ? 'border-slate-800' : 'border-slate-200'
+          }`}>
+            <div>
+              <h3 className={`font-bold text-sm flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                <CalendarClock className="w-4 h-4 text-emerald-500" />
+                <span>جدول توزيع الحصص الرسمي (16 حصة أسبوعية)</span>
+              </h3>
+              <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                اضغط على أي حصة للانتقال الفوري إلى قائمة تلاميذ القسم المعني.
+              </p>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-right text-xs">
+              <thead className={`font-bold border-b ${
+                isDark ? 'bg-slate-950/80 text-slate-400 border-slate-800' : 'bg-slate-50 text-slate-600 border-slate-200'
+              }`}>
+                <tr>
+                  <th className="p-3.5 pr-4">اليوم</th>
+                  <th className="p-3.5">التوقيت</th>
+                  <th className="p-3.5">المستوى</th>
+                  <th className="p-3.5">الفوج</th>
+                  <th className="p-3.5">الحالة</th>
+                  <th className="p-3.5 text-center">انتقال</th>
+                </tr>
+              </thead>
+              <tbody className={`divide-y ${isDark ? 'divide-slate-800/80 text-slate-300' : 'divide-slate-100 text-slate-700'}`}>
+                {OFFICIAL_TIMETABLE.map((slot) => {
+                  const isNow = scheduleStatus.activeSlot?.id === slot.id;
+                  const isNext = scheduleStatus.nextTodaySlot?.id === slot.id;
+                  return (
+                    <tr
+                      key={slot.id}
+                      className={`transition-colors ${
+                        isNow
+                          ? isDark ? 'bg-emerald-950/40' : 'bg-emerald-50/80'
+                          : isDark ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50'
+                      }`}
+                    >
+                      <td className="p-3.5 pr-4 font-bold">{slot.dayLabelAr}</td>
+                      <td className="p-3.5 font-mono font-bold text-emerald-500">
+                        {slot.startTime} - {slot.endTime}
+                      </td>
+                      <td className={`p-3.5 font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                        {slot.levelLabel}
+                      </td>
+                      <td className="p-3.5 font-black">{slot.groupLabel}</td>
+                      <td className="p-3.5">
+                        {isNow ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[10px] font-black">
+                            <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                            الحصة الآن
+                          </span>
+                        ) : isNext ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-500 border border-amber-500/40 text-[10px] font-bold">
+                            القادمة اليوم
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 text-[11px]">مبرمجة</span>
+                        )}
+                      </td>
+                      <td className="p-3.5 text-center">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveClassId(slot.classId);
+                            setActiveTab('roster');
+                          }}
+                          className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold inline-flex items-center gap-1"
+                        >
+                          <span>عرض القائمة</span>
+                          <ArrowLeft className="w-3 h-3" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
