@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { MobileFieldView } from './components/mobile/MobileFieldView';
 import { DesktopDashboard } from './components/desktop/DesktopDashboard';
+import { OfflineIndicator } from './components/pwa/OfflineIndicator';
 
 function detectIsMobileBrowser(): boolean {
   if (typeof window === 'undefined') return false;
@@ -82,6 +83,7 @@ export default function App() {
   return (
     <AppProvider>
       <AppContent />
+      <OfflineIndicator />
     </AppProvider>
   );
 }

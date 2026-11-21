@@ -5,6 +5,7 @@ import { ObservationType, Student } from '../../types';
 import { ImportStudentsModal } from './ImportStudentsModal';
 import { OfficialReportModal } from '../print/OfficialReportModal';
 import { GoogleCloudSyncButton } from '../auth/GoogleCloudSyncButton';
+import { PWAInstallButton } from '../pwa/PWAInstallButton';
 import { OFFICIAL_TIMETABLE } from '../../data/scheduleData';
 import { getLocalDateStr } from '../../utils/date';
 import { 
@@ -180,6 +181,7 @@ export const DesktopDashboard: React.FC = () => {
 
         {/* Google Cloud Sync & Quick Actions */}
         <div className="flex items-center gap-2 flex-wrap">
+          <PWAInstallButton />
           <GoogleCloudSyncButton />
 
           <button

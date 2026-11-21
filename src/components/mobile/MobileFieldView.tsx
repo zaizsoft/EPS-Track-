@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { QuickActionModal } from './QuickActionModal';
 import { GoogleCloudSyncButton } from '../auth/GoogleCloudSyncButton';
+import { PWAInstallButton } from '../pwa/PWAInstallButton';
 import { observationTypesConfig } from '../../data/mockData';
 import { OFFICIAL_TIMETABLE, getSlotsForClass } from '../../data/scheduleData';
 import { Student } from '../../types';
@@ -137,6 +138,7 @@ export const MobileFieldView: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
+            <PWAInstallButton compact />
             <GoogleCloudSyncButton compact />
 
             {/* Quick theme button inside phone for outdoor sunlight toggle */}
