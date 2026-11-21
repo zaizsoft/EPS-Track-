@@ -102,7 +102,7 @@ service cloud.firestore {
 
     // Teacher Workspace Root
     match /teachers/{teacherId} {
-      allow get: if isValidId(teacherId) && isOwner(teacherId) && existing().ownerId == request.auth.uid;
+      allow get: if isValidId(teacherId) && isOwner(teacherId) && (resource == null || existing().ownerId == request.auth.uid);
       allow list: if isVerifiedUser() && resource.data.ownerId == request.auth.uid;
       allow create: if isValidId(teacherId)
         && isOwner(teacherId)
@@ -120,7 +120,7 @@ service cloud.firestore {
 
       // Classes subcollection
       match /classes/{classId} {
-        allow get: if isValidId(teacherId) && isValidId(classId) && isOwner(teacherId) && existing().ownerId == request.auth.uid;
+        allow get: if isValidId(teacherId) && isValidId(classId) && isOwner(teacherId) && (resource == null || existing().ownerId == request.auth.uid);
         allow list: if isVerifiedUser() && teacherId == request.auth.uid && resource.data.ownerId == request.auth.uid;
         allow create: if isValidId(teacherId)
           && isValidId(classId)
@@ -150,7 +150,7 @@ service cloud.firestore {
 
       // Students subcollection
       match /students/{studentId} {
-        allow get: if isValidId(teacherId) && isValidId(studentId) && isOwner(teacherId) && existing().ownerId == request.auth.uid;
+        allow get: if isValidId(teacherId) && isValidId(studentId) && isOwner(teacherId) && (resource == null || existing().ownerId == request.auth.uid);
         allow list: if isVerifiedUser() && teacherId == request.auth.uid && resource.data.ownerId == request.auth.uid;
         allow create: if isValidId(teacherId)
           && isValidId(studentId)
@@ -180,7 +180,7 @@ service cloud.firestore {
 
       // Observations subcollection
       match /observations/{observationId} {
-        allow get: if isValidId(teacherId) && isValidId(observationId) && isOwner(teacherId) && existing().ownerId == request.auth.uid;
+        allow get: if isValidId(teacherId) && isValidId(observationId) && isOwner(teacherId) && (resource == null || existing().ownerId == request.auth.uid);
         allow list: if isVerifiedUser() && teacherId == request.auth.uid && resource.data.ownerId == request.auth.uid;
         allow create: if isValidId(teacherId)
           && isValidId(observationId)
